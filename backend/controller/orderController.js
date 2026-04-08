@@ -3,11 +3,18 @@ import Course from "../model/courseModel.js";
 import User from "../model/userModel.js";
 import axios from "axios";
 
+// Recommendation imports
+import UserInteraction from "../model/userInteractionModel.js";
+import {
+  updateUserPreferences,
+  updateCourseStats,
+} from "./recommendationController.js";
+
 // Get PayPal access token
 const getPayPalAccessToken = async () => {
   try {
     const auth = Buffer.from(
-      process.env.PAYPAL_CLIENT_ID + ":" + process.env.PAYPAL_CLIENT_SECRET
+      process.env.PAYPAL_CLIENT_ID + ":" + process.env.PAYPAL_CLIENT_SECRET,
     ).toString("base64");
 
     const response = await axios.post(
@@ -18,14 +25,14 @@ const getPayPalAccessToken = async () => {
           Authorization: `Basic ${auth}`,
           "Content-Type": "application/x-www-form-urlencoded",
         },
-      }
+      },
     );
 
     return response.data.access_token;
   } catch (error) {
     console.error(
       "Error getting PayPal access token:",
-      error.response?.data || error.message
+      error.response?.data || error.message,
     );
     throw error;
   }
@@ -45,7 +52,6 @@ export const createPayPalOrder = async (req, res) => {
       return res.status(400).json({ message: "Course ID is required" });
     }
 
-    // Find course and user
     const course = await Course.findById(courseId);
     const user = await User.findById(userId);
 
@@ -60,7 +66,6 @@ export const createPayPalOrder = async (req, res) => {
     console.log("Course price:", course.price);
     console.log("Course title:", course.title);
 
-    // Check if user already purchased this course
     const existingOrder = await Order.findOne({
       user: userId,
       course: courseId,
@@ -73,11 +78,9 @@ export const createPayPalOrder = async (req, res) => {
         .json({ message: "You already purchased this course" });
     }
 
-    // Get PayPal access token
     const accessToken = await getPayPalAccessToken();
     console.log("PayPal access token received");
 
-    // Create PayPal order using REST API
     const orderData = {
       intent: "CAPTURE",
       purchase_units: [
@@ -108,13 +111,12 @@ export const createPayPalOrder = async (req, res) => {
           Authorization: `Bearer ${accessToken}`,
           "Content-Type": "application/json",
         },
-      }
+      },
     );
 
     const paypalOrder = response.data;
     console.log("PayPal order created:", paypalOrder.id);
 
-    // Create order in database
     const newOrder = await Order.create({
       user: userId,
       course: courseId,
@@ -155,16 +157,17 @@ export const capturePayPalOrder = async (req, res) => {
 
     console.log("Capturing PayPal order:", orderID);
 
-    // Find the order in database
-    const order = await Order.findOne({ orderId: orderID, user: userId });
+    const order = await Order.findOne({
+      orderId: orderID,
+      user: userId,
+    });
+
     if (!order) {
       return res.status(404).json({ message: "Order not found" });
     }
 
-    // Get PayPal access token
     const accessToken = await getPayPalAccessToken();
 
-    // Capture payment with PayPal REST API
     const response = await axios.post(
       `https://api.sandbox.paypal.com/v2/checkout/orders/${orderID}/capture`,
       {},
@@ -173,69 +176,73 @@ export const capturePayPalOrder = async (req, res) => {
           Authorization: `Bearer ${accessToken}`,
           "Content-Type": "application/json",
         },
-      }
+      },
     );
 
     const capture = response.data;
 
     if (capture.status === "COMPLETED") {
-      // Update order status
+      // Update order
       order.status = "completed";
       order.paymentId = capture.purchase_units[0].payments.captures[0].id;
       order.payerId = capture.payer.payer_id;
       await order.save();
 
-      // DEBUG: Log before enrollment
       console.log("=== ENROLLMENT DEBUG ===");
       console.log("User ID:", userId);
       console.log("Course ID to enroll:", order.course);
 
-      // ✅ FIXED: Add course to user's enrolledCourses AND user to course's enrolledStudents
       const [updatedUser, updatedCourse] = await Promise.all([
-        // Add course to user's enrolled courses
         User.findByIdAndUpdate(
           userId,
-          {
-            $addToSet: { enrolledCourses: order.course },
-          },
-          { new: true }
+          { $addToSet: { enrolledCourses: order.course } },
+          { new: true },
         ),
-        // Add user to course's enrolled students
         Course.findByIdAndUpdate(
           order.course,
-          {
-            $addToSet: { enrolledStudents: userId },
-          },
-          { new: true }
+          { $addToSet: { enrolledStudents: userId } },
+          { new: true },
         ),
       ]);
 
-      // DEBUG: Log after updates
+      // Recommendation tracking
+      await UserInteraction.create({
+        userId,
+        courseId: order.course,
+        interactionType: "purchase",
+        timestamp: new Date(),
+      });
+
+      await updateUserPreferences(userId, order.course, "purchase");
+
+      await updateCourseStats(order.course, "enrollment");
+
       console.log("Updated user enrolledCourses:", updatedUser.enrolledCourses);
       console.log(
         "Updated course enrolledStudents:",
-        updatedCourse.enrolledStudents
+        updatedCourse.enrolledStudents,
       );
       console.log("=== END ENROLLMENT DEBUG ===");
 
-      res.status(200).json({
+      return res.status(200).json({
         message: "Payment completed successfully",
-        order: order,
-        capture: capture,
+        order,
+        capture,
       });
     } else {
       order.status = "failed";
       await order.save();
-      res.status(400).json({ message: "Payment failed" });
+      return res.status(400).json({ message: "Payment failed" });
     }
   } catch (error) {
     console.error("PayPal capture error:", error);
     if (error.response) {
       console.error("PayPal capture error response:", error.response.data);
     }
-    res
-      .status(500)
-      .json({ message: "Failed to capture payment", error: error.message });
+    res.status(500).json({
+      message: "Failed to capture payment",
+      error: error.message,
+    });
   }
 };
 
@@ -249,13 +256,14 @@ export const getUserOrders = async (req, res) => {
 
     res.status(200).json(orders);
   } catch (error) {
-    res
-      .status(500)
-      .json({ message: "Failed to get orders", error: error.message });
+    res.status(500).json({
+      message: "Failed to get orders",
+      error: error.message,
+    });
   }
 };
 
-// Check if user has purchased a course
+// Check if user purchased course
 export const checkCoursePurchase = async (req, res) => {
   try {
     const { courseId } = req.params;

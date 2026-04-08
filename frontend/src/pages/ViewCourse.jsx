@@ -3,6 +3,7 @@ import { FaArrowLeftLong, FaStar } from "react-icons/fa6";
 import { useDispatch, useSelector } from "react-redux";
 import { useNavigate, useParams } from "react-router-dom";
 import { setSelectedCourse } from "../redux/courseSlice";
+import { setUserData } from "../redux/userSlice"; // IMPORT ADDED
 import img from "../assets/empty.jpg";
 import { FaPlayCircle } from "react-icons/fa";
 import { FaLock } from "react-icons/fa6";
@@ -12,9 +13,10 @@ import axios from "axios";
 import { serverUrl } from "../App";
 import { toast } from "react-toastify";
 import { ClipLoader } from "react-spinners";
+import useSimilarCourses from "../customHooks/useSimilarCourses";
+import { FaUsers } from "react-icons/fa";
 
 // PayPal SDK Script
-// Update your PayPal script loading
 const loadPayPalScript = () => {
   return new Promise((resolve) => {
     if (window.paypal) {
@@ -45,22 +47,34 @@ const ViewCourse = () => {
   const [loading, setLoading] = useState(false);
   const [paypalLoaded, setPaypalLoaded] = useState(false);
   const [loading1, setLoading1] = useState(false);
+  const [courseLoading, setCourseLoading] = useState(true);
+  const { fetchSimilarCourses, loading: similarLoading } = useSimilarCourses();
+  const [similarCoursesList, setSimilarCoursesList] = useState([]);
 
   const [rating, setRating] = useState(0);
   const [comment, setComment] = useState("");
 
   // Check if user is enrolled in the course
   const checkEnrollment = async () => {
-    if (!userData?._id || !courseId) return;
+    if (!userData?._id || !courseId) {
+      console.log("Cannot check enrollment: missing user or courseId", {
+        userData,
+        courseId,
+      });
+      return;
+    }
 
     try {
+      console.log("Checking enrollment for course:", courseId);
       const response = await axios.get(
         `${serverUrl}/api/order/check-purchase/${courseId}`,
-        { withCredentials: true }
+        { withCredentials: true },
       );
+      console.log("Enrollment check response:", response.data);
       setIsEnrolled(response.data.purchased);
     } catch (error) {
       console.log("Error checking enrollment:", error);
+      setIsEnrolled(false);
     }
   };
 
@@ -78,13 +92,22 @@ const ViewCourse = () => {
     }
   }, [userData, courseId]);
 
+  // Safe course data fetching
   const fetchCourseData = async () => {
-    courseData.map((course) => {
-      if (course._id === courseId) {
-        dispatch(setSelectedCourse(course));
-        return null;
-      }
-    });
+    if (!courseData || courseData.length === 0) {
+      console.log("Course data not loaded yet");
+      setCourseLoading(true);
+      return;
+    }
+
+    const foundCourse = courseData.find((course) => course._id === courseId);
+    if (foundCourse) {
+      dispatch(setSelectedCourse(foundCourse));
+      setCourseLoading(false);
+    } else {
+      console.log("Course not found in courseData");
+      setCourseLoading(false);
+    }
   };
 
   useEffect(() => {
@@ -96,7 +119,7 @@ const ViewCourse = () => {
             {
               userId: selectedCourse?.creator,
             },
-            { withCredentials: true }
+            { withCredentials: true },
           );
           setCreatorData(result.data);
         } catch (error) {
@@ -112,17 +135,26 @@ const ViewCourse = () => {
   }, [courseData, courseId]);
 
   useEffect(() => {
-    if (creatorData?._id && courseData.length > 0) {
+    if (courseId) {
+      const getSimilar = async () => {
+        const courses = await fetchSimilarCourses(courseId, 4);
+        setSimilarCoursesList(courses || []);
+      };
+      getSimilar();
+    }
+  }, [courseId]);
+
+  useEffect(() => {
+    if (creatorData?._id && courseData?.length > 0) {
       const creatorCourse = courseData.filter(
         (course) =>
-          course.creator === creatorData?._id && course._id !== courseId
+          course.creator === creatorData?._id && course._id !== courseId,
       );
       setCreatorCourses(creatorCourse);
     }
-  }, [creatorData, courseData]);
+  }, [creatorData, courseData, courseId]);
 
   // PayPal Payment Handler
-  // PayPal Payment Handler - FIXED VERSION
   const handlePayment = async () => {
     if (!userData) {
       alert("Please login to purchase this course");
@@ -132,41 +164,35 @@ const ViewCourse = () => {
 
     setLoading(true);
     try {
-      // Create PayPal order
       const { data } = await axios.post(
         `${serverUrl}/api/order/create-paypal-order`,
         { courseId },
-        { withCredentials: true }
+        { withCredentials: true },
       );
 
       console.log("PayPal order response:", data);
 
       if (data.orderID && window.paypal) {
-        // Clear any existing buttons
         const container = document.getElementById("paypal-button-container");
         if (container) {
           container.innerHTML = "";
         }
 
-        // Store the order ID in a variable that the PayPal button can access
         const paypalOrderID = data.orderID;
 
-        // Render PayPal buttons with CORRECT configuration
         window.paypal
           .Buttons({
             createOrder: function (data, actions) {
               console.log("Using PayPal order ID:", paypalOrderID);
-              // Return the order ID from our backend
               return paypalOrderID;
             },
             onApprove: async function (data, actions) {
               console.log("Payment approved:", data);
               try {
-                // Capture payment
                 const response = await axios.post(
                   `${serverUrl}/api/order/capture-paypal-order`,
                   { orderID: data.orderID },
-                  { withCredentials: true }
+                  { withCredentials: true },
                 );
 
                 console.log("Capture response:", response);
@@ -174,15 +200,34 @@ const ViewCourse = () => {
                 if (
                   response.data.message === "Payment completed successfully"
                 ) {
-                  setIsEnrolled(true);
-                  alert(
-                    "Payment successful! You are now enrolled in this course."
+                  // Fetch updated user data
+                  const userResponse = await axios.get(
+                    `${serverUrl}/api/user/getcurrentUser`,
+                    { withCredentials: true },
                   );
-                  // You can redirect to course content or refresh the page
+
+                  // Update Redux store with new user data
+                  dispatch(setUserData(userResponse.data));
+
+                  // Re-check enrollment (should now be true)
+                  await checkEnrollment();
+
+                  toast.success(
+                    "Payment successful! You are now enrolled in this course.",
+                  );
+
+                  // Clear the PayPal button container
+                  const container = document.getElementById(
+                    "paypal-button-container",
+                  );
+                  if (container) {
+                    container.innerHTML = "";
+                  }
                 }
               } catch (error) {
                 console.error("Payment capture error:", error);
-                alert("Payment failed. Please try again.");
+                toast.error("Payment failed. Please try again.");
+                setLoading(false);
               }
             },
             onError: (err) => {
@@ -214,10 +259,38 @@ const ViewCourse = () => {
       setLoading(false);
     }
   };
+
   // Handle Watch Now - redirect to course content
-  const handleWatchNow = () => {
-    navigate(`/view-lectures/${courseId}`);
+  const handleWatchNow = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    console.log("===== WATCH NOW DEBUG =====");
+    console.log("1. Button clicked");
+    console.log("2. isEnrolled state:", isEnrolled);
+    console.log("3. courseId from params:", courseId);
+    console.log("4. userData:", userData);
+    console.log("5. Navigation target:", `/view-lectures/${courseId}`);
+
+    if (isEnrolled) {
+      console.log("6. User is enrolled, attempting navigation...");
+      try {
+        navigate(`/view-lectures/${courseId}`);
+        console.log("7. Navigation called successfully");
+      } catch (error) {
+        console.error("8. Navigation error:", error);
+      }
+    } else {
+      console.log("6. User not enrolled, showing toast");
+      toast.error("You need to enroll in this course first");
+    }
+    console.log("===== END DEBUG =====");
   };
+
+  // Add this useEffect to monitor enrollment changes
+  useEffect(() => {
+    console.log("isEnrolled changed to:", isEnrolled);
+  }, [isEnrolled]);
 
   const handleReview = async () => {
     setLoading1(true);
@@ -229,7 +302,7 @@ const ViewCourse = () => {
           comment,
           courseId,
         },
-        { withCredentials: true }
+        { withCredentials: true },
       );
       setLoading1(false);
       toast.success("Review Added");
@@ -238,8 +311,8 @@ const ViewCourse = () => {
       setComment("");
     } catch (error) {
       console.log(error);
-      setLoading(false);
-      toast.error(error.response.data.message);
+      setLoading1(false);
+      toast.error(error.response?.data?.message || "Error adding review");
       setRating(0);
       setComment("");
     }
@@ -255,35 +328,44 @@ const ViewCourse = () => {
 
   const avgRating = calculateAvgReview(selectedCourse?.reviews);
 
+  // Loading check
+  if (courseLoading || !selectedCourse) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <ClipLoader size={50} color="#3B82F6" />
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gray-50 p-6">
       <div className="max-w-6xl mx-auto bg-white shadow-md rounded-xl p-6 space-y-6 relative">
-        {/* top section  */}
+        {/* Back button and thumbnail section */}
         <div className="flex flex-col md:flex-row gap-6">
-          {/* thumbnail  */}
+          {/* thumbnail */}
           <div className="w-full md:w-1/2">
             <FaArrowLeftLong
-              className="text-[black] w-[22px] h-[22px] cursor-pointer"
+              className="text-[black] w-[22px] h-[22px] cursor-pointer mb-4"
               onClick={() => navigate("/")}
             />
             {selectedCourse?.thumbnail ? (
               <img
                 src={selectedCourse?.thumbnail}
-                alt=""
-                className="rounded-xl w-full object-cover "
+                alt={selectedCourse?.title}
+                className="rounded-xl w-full object-cover h-[300px]"
               />
             ) : (
               <img
                 src={img}
-                alt=""
-                className="rounded-xl w-full object-cover "
+                alt="placeholder"
+                className="rounded-xl w-full object-cover h-[300px]"
               />
             )}
           </div>
 
-          {/* course info  */}
-          <div className="flex-1 space-y-2 mt-[20px] ">
-            <h2 className="text-2xl font-bold ">{selectedCourse?.title}</h2>
+          {/* course info */}
+          <div className="flex-1 space-y-2">
+            <h2 className="text-2xl font-bold">{selectedCourse?.title}</h2>
             <p className="text-gray-600">{selectedCourse?.subTitle}</p>
             <div className="flex items-start flex-col justify-between">
               <div className="text-yellow-500 font-medium flex gap-2">
@@ -291,7 +373,9 @@ const ViewCourse = () => {
                   <FaStar />
                   {avgRating}
                 </span>
-                <span className="text-gray-400">(1200 Reviews)</span>
+                <span className="text-gray-400">
+                  ({selectedCourse?.reviews?.length || 0} Reviews)
+                </span>
               </div>
               <div className="text-lg font-semibold text-black">
                 <span>${selectedCourse?.price}</span>{" "}
@@ -299,13 +383,17 @@ const ViewCourse = () => {
               </div>
 
               <ul className="text-sm text-gray-700 space-y-1 pt-2">
-                <li>✅ 10+ hours of video content</li>
+                <li>
+                  ✅ {selectedCourse?.lectures?.length || 0}+ hours of video
+                  content
+                </li>
                 <li>✅ Lifetime access to course materials</li>
                 <li>✅ Certificate of completion</li>
               </ul>
 
               {/* Enrollment/Payment Section */}
               <div className="mt-4 w-full">
+                {console.log("Rendering button - isEnrolled:", isEnrolled)}
                 {!isEnrolled ? (
                   <div className="space-y-3">
                     <button
@@ -333,20 +421,28 @@ const ViewCourse = () => {
                     )}
                   </div>
                 ) : (
-                  <button
-                    className="bg-green-600 text-white px-6 py-3 rounded hover:bg-green-700 w-full font-semibold cursor-pointer"
-                    onClick={handleWatchNow}
-                  >
-                    Watch Now
-                  </button>
+                  <div className="space-y-3">
+                    <div className="bg-green-50 border border-green-200 rounded-lg p-3 text-center">
+                      <p className="text-green-700 font-medium mb-2">
+                        ✅ You are enrolled in this course!
+                      </p>
+                      <button
+                        className="bg-green-600 text-white px-6 py-3 rounded hover:bg-green-700 w-full font-semibold cursor-pointer"
+                        onClick={handleWatchNow}
+                      >
+                        Watch Now
+                      </button>
+                    </div>
+                  </div>
                 )}
               </div>
             </div>
           </div>
         </div>
 
+        {/* What You'll Learn */}
         <div>
-          <h2 className="text-xl font-semibold mb-2 ">What You'll Learn</h2>
+          <h2 className="text-xl font-semibold mb-2">What You'll Learn</h2>
           <ul className="list-disc pl-6 text-gray-700 space-y-1">
             <li>Learn {selectedCourse?.category} from Beginning</li>
             <li>Build real-world projects</li>
@@ -354,27 +450,30 @@ const ViewCourse = () => {
           </ul>
         </div>
 
+        {/* This Course is for */}
         <div className="text-xl font-semibold mb-2">
           <h2>This Course is for</h2>
-          <p className="text-gray-700 list-disc pl-6 space-y-1 text-0.5">
+          <p className="text-gray-700 list-disc pl-6 space-y-1 text-base">
             Beginners, aspiring developers, and professionals looking to upgrade
             skills.
           </p>
         </div>
 
-        <div className="flex flex-col md:flex-row gap-6 ">
+        {/* Course Curriculum and Video Preview */}
+        <div className="flex flex-col md:flex-row gap-6">
+          {/* Curriculum Section */}
           <div className="bg-white w-full md:w-2/5 p-6 rounded-2xl shadow-lg border border-gray-200">
-            <h2 className="text-xl font-bold mb-1 text-gray-800 ">
+            <h2 className="text-xl font-bold mb-1 text-gray-800">
               Course Curriculum
             </h2>
             <p className="text-sm text-gray-500 mb-4">
               {selectedCourse?.lectures?.length} Lectures
             </p>
 
-            <div className="flex flex-col gap-3">
+            <div className="flex flex-col gap-3 max-h-96 overflow-y-auto">
               {selectedCourse?.lectures?.map((lecture, index) => (
                 <button
-                  key={index}
+                  key={lecture._id || index}
                   disabled={!lecture.isPreviewFree && !isEnrolled}
                   onClick={() => {
                     if (lecture.isPreviewFree || isEnrolled) {
@@ -383,10 +482,10 @@ const ViewCourse = () => {
                   }}
                   className={`flex items-center gap-3 px-4 py-3 rounded-lg border transition-all duration-200 text-left ${
                     lecture.isPreviewFree || isEnrolled
-                      ? "hover:bg-gray-100 cursor-pointer border-gray-300 "
+                      ? "hover:bg-gray-100 cursor-pointer border-gray-300"
                       : "cursor-not-allowed opacity-60 border-gray-200"
-                  }${
-                    selectedLecture?.lectureTitle === lecture?.lectureTitle
+                  } ${
+                    selectedLecture?._id === lecture?._id
                       ? "bg-gray-100 border-gray-400"
                       : ""
                   }`}
@@ -398,7 +497,7 @@ const ViewCourse = () => {
                       <FaLock />
                     )}
                   </span>
-                  <span className="text-sm font-medium text-gray-800">
+                  <span className="text-sm font-medium text-gray-800 truncate">
                     {lecture?.lectureTitle}
                     {!lecture.isPreviewFree && !isEnrolled && (
                       <span className="text-xs text-gray-500 ml-2">
@@ -411,6 +510,7 @@ const ViewCourse = () => {
             </div>
           </div>
 
+          {/* Video Preview Section */}
           <div className="bg-white w-full md:w-3/5 p-6 rounded-2xl shadow-lg border border-gray-200">
             <div className="aspect-video w-full rounded-lg overflow-hidden mb-4 bg-black flex items-center justify-center">
               {selectedLecture?.videoUrl ? (
@@ -420,7 +520,7 @@ const ViewCourse = () => {
                   controls
                 />
               ) : (
-                <span className="text-white text-sm ">
+                <span className="text-white text-sm">
                   {isEnrolled
                     ? "Select a lecture to watch"
                     : "Select a preview lecture to watch"}
@@ -449,17 +549,18 @@ const ViewCourse = () => {
           </div>
         </div>
 
+        {/* Review Section */}
         <div className="mt-8 border-t pt-6">
           <h2 className="text-xl font-semibold mb-2">Write a Review</h2>
-          <div className="mb-4 ">
-            <div className="flex gap-1 mb-2 ">
+          <div className="mb-4">
+            <div className="flex gap-1 mb-2">
               {[1, 2, 3, 4, 5].map((star) => (
                 <FaStar
                   key={star}
                   onClick={() => setRating(star)}
-                  className={
+                  className={`cursor-pointer ${
                     star <= rating ? "fill-amber-300" : "fill-gray-300"
-                  }
+                  }`}
                 />
               ))}
             </div>
@@ -472,12 +573,12 @@ const ViewCourse = () => {
               rows={3}
             />
             <button
-              className="bg-black text-white mt-3 px-4 py-2 rounded hover:bg-gray-800"
-              disabled={loading1}
+              className="bg-black text-white mt-3 px-4 py-2 rounded hover:bg-gray-800 disabled:opacity-50"
+              disabled={loading1 || !rating || !comment}
               onClick={handleReview}
             >
               {loading1 ? (
-                <ClipLoader size={30} color="white" />
+                <ClipLoader size={20} color="white" />
               ) : (
                 "Submit Review"
               )}
@@ -485,49 +586,90 @@ const ViewCourse = () => {
           </div>
         </div>
 
-        {/* For Instructor/creator info */}
+        {/* Instructor Info */}
         <div className="flex items-center gap-4 pt-4 border-t">
           {creatorData?.photoUrl ? (
             <img
               src={creatorData?.photoUrl}
-              className="w-16 h-16 rounded-full object-cover border-1 border-gray-200"
+              alt={creatorData?.name}
+              className="w-16 h-16 rounded-full object-cover border border-gray-200"
             />
           ) : (
             <img
               src={img}
-              alt=""
-              className="w-16 h-16 rounded-full object-cover border-1 border-gray-200"
+              alt="instructor"
+              className="w-16 h-16 rounded-full object-cover border border-gray-200"
             />
           )}
 
           <div>
             <h2 className="text-lg font-semibold">{creatorData?.name}</h2>
-            <p className="md:text-sm text-gray-600 text-[10px] ">
-              {creatorData?.description}
+            <p className="text-sm text-gray-600">
+              {creatorData?.description || "Course Instructor"}
             </p>
-            <p className="md:text-sm text-gray-600 text-[10px]">
-              {creatorData?.email}
-            </p>
+            <p className="text-sm text-gray-500">{creatorData?.email}</p>
           </div>
         </div>
 
-        <div>
-          <p className="text-xl font-semibold mb-2">
-            Other Published Courses by the Educator -
-          </p>
-        </div>
-        <div className="w-full transition-all duration-300 py-[20px] flex items-start justify-center lg:justify-start flex-wrap gap-6 lg:px-[80px] ">
-          {creatorCourses?.map((course, index) => (
-            <Card
-              key={index}
-              thumbnail={course.thumbnail}
-              id={course._id}
-              price={course.price}
-              title={course.title}
-              category={course.category}
-            />
-          ))}
-        </div>
+        {/* Similar Courses */}
+        {similarCoursesList.length > 0 && (
+          <div className="mt-8 pt-6 border-t">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h2 className="text-xl font-semibold text-gray-900 flex items-center gap-2">
+                  <FaUsers className="text-blue-500" />
+                  Similar Courses You Might Like
+                </h2>
+                <p className="text-sm text-gray-600 mt-1">
+                  Based on the content and category of this course
+                </p>
+              </div>
+            </div>
+
+            {similarLoading ? (
+              <div className="flex justify-center py-8">
+                <ClipLoader size={30} color="#3B82F6" />
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                {similarCoursesList.map((item) => (
+                  <div key={item.courseId._id} className="relative">
+                    <div className="absolute top-2 left-2 z-10 bg-blue-500/90 backdrop-blur-sm text-white rounded-full px-2 py-1 text-xs font-medium">
+                      {Math.round(item.score * 100)}% Match
+                    </div>
+
+                    <Card
+                      thumbnail={item.courseId.thumbnail}
+                      id={item.courseId._id}
+                      price={item.courseId.price}
+                      title={item.courseId.title}
+                      category={item.courseId.category}
+                    />
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Creator's Other Courses */}
+        {creatorCourses?.length > 0 && (
+          <div className="w-full transition-all duration-300 py-[20px] flex items-start justify-center lg:justify-start flex-wrap gap-6">
+            <h2 className="text-xl font-semibold w-full mb-4">
+              More from {creatorData?.name}
+            </h2>
+            {creatorCourses.map((course, index) => (
+              <Card
+                key={index}
+                thumbnail={course.thumbnail}
+                id={course._id}
+                price={course.price}
+                title={course.title}
+                category={course.category}
+              />
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );

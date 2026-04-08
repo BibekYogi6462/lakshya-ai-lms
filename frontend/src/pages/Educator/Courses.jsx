@@ -7,12 +7,13 @@
 // import axios from "axios";
 // import { serverUrl } from "../../App";
 // import { setCreatorCourseData } from "../../redux/courseSlice";
-// // import getCreatorCourse from "../../customHooks/getCreatorCourse";
+
 // const Courses = () => {
 //   const navigate = useNavigate();
 //   const dispatch = useDispatch();
 //   const userData = useSelector((state) => state.user);
 //   const { creatorCourseData } = useSelector((state) => state.course);
+
 //   useEffect(() => {
 //     const creatorCourses = async () => {
 //       try {
@@ -26,7 +27,8 @@
 //       }
 //     };
 //     creatorCourses();
-//   }, [userData]);
+//   }, [userData, dispatch]); // Added dispatch to dependencies
+
 //   return (
 //     <div className="flex min-h-screen bg-gray-100">
 //       <div className="w-[100%] min-h-screen p-4 sm:p-6 bg-gray-100">
@@ -36,7 +38,7 @@
 //               className="w-[22px] h-[22px] cursor-pointer"
 //               onClick={() => navigate("/dashboard")}
 //             />
-//             <h1 className="text -2xl font-semibold">All Created Courses</h1>
+//             <h1 className="text-2xl font-semibold">All Created Courses</h1>
 //           </div>
 //           <button
 //             className="bg-[black] text-white px-4 py-2 rounded hover:bg-gray-500"
@@ -48,7 +50,7 @@
 
 //         <div className="hidden md:block bg-white rounded-xl shadow p-4 overflow-x-auto">
 //           <table className="min-w-full text-sm">
-//             <thead className="border-b bg-ray-50">
+//             <thead className="border-b bg-gray-50">
 //               <tr>
 //                 <th className="text-left py-3 px-4">Courses</th>
 //                 <th className="text-left py-3 px-4">Prices</th>
@@ -62,7 +64,7 @@
 //                   key={index}
 //                   className="border-b hover:bg-gray-50 transition duration-200"
 //                 >
-//                   <td className="py-3 px-45 flex items-center gap-4">
+//                   <td className="py-3 px-4 flex items-center gap-4">
 //                     {course.thumbnail ? (
 //                       <img
 //                         src={course?.thumbnail}
@@ -109,7 +111,7 @@
 //           </p>
 //         </div>
 
-//         {/* //For smaller device */}
+//         {/* For smaller device */}
 //         <div className="md:hidden space-y-4">
 //           {creatorCourseData?.map((course, index) => (
 //             <div
@@ -145,8 +147,7 @@
 //               </span>
 //             </div>
 //           ))}
-//           <p className="text-center text-sm text-gray-400 mt-4]">
-//             {" "}
+//           <p className="text-center text-sm text-gray-400 mt-4">
 //             A list of your recent courses
 //           </p>
 //         </div>
@@ -156,7 +157,6 @@
 // };
 
 // export default Courses;
-
 import React, { useEffect } from "react";
 import { FaArrowLeftLong } from "react-icons/fa6";
 import { FaEdit } from "react-icons/fa";
@@ -176,9 +176,13 @@ const Courses = () => {
   useEffect(() => {
     const creatorCourses = async () => {
       try {
-        const result = await axios.get(serverUrl + "/api/course/getcreator", {
-          withCredentials: true,
-        });
+        // FIXED: Changed from "/getcreator" to "/creator-courses"
+        const result = await axios.get(
+          serverUrl + "/api/course/creator-courses",
+          {
+            withCredentials: true,
+          },
+        );
         console.log(result.data);
         dispatch(setCreatorCourseData(result.data));
       } catch (error) {
@@ -186,7 +190,7 @@ const Courses = () => {
       }
     };
     creatorCourses();
-  }, [userData, dispatch]); // Added dispatch to dependencies
+  }, [userData, dispatch]);
 
   return (
     <div className="flex min-h-screen bg-gray-100">

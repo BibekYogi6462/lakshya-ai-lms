@@ -15,7 +15,7 @@ const ViewLectures = () => {
   const selectedCourse = courseData?.find((course) => course._id === courseId);
   const [creatorData, setCreatorData] = useState(null);
   const [selectedLecture, setSelectedLecture] = useState(
-    selectedCourse?.lectures?.[0] || null
+    selectedCourse?.lectures?.[0] || null,
   );
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -27,6 +27,16 @@ const ViewLectures = () => {
 
   const videoRef = useRef(null);
   const navigate = useNavigate();
+
+  // // Check if user is enrolled
+  // const isEnrolled = userData?.enrolledCourses?.includes(courseId) || false;
+
+  // // Redirect if not enrolled
+  // useEffect(() => {
+  //   if (userData && !isEnrolled && selectedCourse) {
+  //     navigate(`/viewcourse/${courseId}`);
+  //   }
+  // }, [userData, isEnrolled, selectedCourse, courseId, navigate]);
 
   // Fetch creator data
   useEffect(() => {
@@ -40,7 +50,7 @@ const ViewLectures = () => {
             {
               userId: selectedCourse?.creator,
             },
-            { withCredentials: true }
+            { withCredentials: true },
           );
           setCreatorData(result.data);
         } catch (error) {
@@ -62,15 +72,25 @@ const ViewLectures = () => {
       if (userData && courseId) {
         try {
           const response = await axios.get(
-            `${serverUrl}/api/progress/course/${courseId}`,
-            { withCredentials: true }
+            `${serverUrl}/api/progress/${courseId}`,
+            { withCredentials: true },
           );
-          // Remove duplicates from completedLectures
-          const uniqueCompletedLectures = [
-            ...new Set(response.data.completedLectures || []),
-          ];
-          setCompletedLectures(uniqueCompletedLectures);
-          calculateProgress(uniqueCompletedLectures);
+
+          console.log("Progress response:", response.data);
+
+          // The response is the progress object directly
+          if (response.data) {
+            const completedList = response.data.completedLectures || [];
+            console.log("Completed lectures from API:", completedList);
+
+            // Remove duplicates
+            const uniqueCompletedLectures = [...new Set(completedList)];
+
+            console.log("Unique completed lectures:", uniqueCompletedLectures);
+
+            setCompletedLectures(uniqueCompletedLectures);
+            calculateProgress(uniqueCompletedLectures);
+          }
         } catch (error) {
           console.error("Error fetching progress:", error);
           setCompletedLectures([]);
@@ -102,27 +122,33 @@ const ViewLectures = () => {
   };
 
   // Mark lecture as completed
+  // Mark lecture as completed
   const markLectureAsCompleted = async (lectureId) => {
-    if (!userData || !courseId || completedLectures.includes(lectureId)) return;
+    if (!userData || !courseId || completedLectures.includes(lectureId)) {
+      return;
+    }
+
+    console.log("Marking lecture as completed:", lectureId);
 
     try {
       const response = await axios.post(
-        `${serverUrl}/api/progress/mark-completed`,
+        `${serverUrl}/api/progress/complete-lecture`,
         {
           courseId,
           lectureId,
         },
-        { withCredentials: true }
+        { withCredentials: true },
       );
 
-      if (response.data.success) {
-        setCompletedLectures((prev) => {
-          // Remove duplicates and add new lecture
-          const newCompleted = [...new Set([...prev, lectureId])];
-          calculateProgress(newCompleted);
-          return newCompleted;
-        });
-      }
+      console.log("Mark completed response:", response.data);
+
+      // Just add this lecture to the list, don't replace with response data
+      setCompletedLectures((prev) => {
+        const newCompleted = [...new Set([...prev, lectureId])];
+        console.log("Updated completed lectures:", newCompleted);
+        calculateProgress(newCompleted);
+        return newCompleted;
+      });
     } catch (error) {
       console.error("Error marking lecture as completed:", error);
     }
@@ -193,9 +219,9 @@ const ViewLectures = () => {
   };
 
   const formatDuration = (duration) => {
-    if (!duration) return "";
+    if (!duration) return "0:00";
     const minutes = Math.floor(duration / 60);
-    const seconds = duration % 60;
+    const seconds = Math.floor(duration % 60);
     return `${minutes}:${seconds.toString().padStart(2, "0")}`;
   };
 
@@ -245,7 +271,7 @@ const ViewLectures = () => {
   const uniqueCompletedLectures = [...new Set(completedLectures)];
   const completedCount = Math.min(
     uniqueCompletedLectures.length,
-    totalLectures
+    totalLectures,
   );
 
   return (
@@ -274,11 +300,6 @@ const ViewLectures = () => {
             <span className="bg-gray-100 px-3 py-1 rounded-full">
               {selectedCourse?.level}
             </span>
-            {selectedCourse?.duration && (
-              <span className="bg-gray-100 px-3 py-1 rounded-full">
-                Duration: {selectedCourse.duration}
-              </span>
-            )}
           </div>
         </div>
 
@@ -323,6 +344,7 @@ const ViewLectures = () => {
               <h2 className="text-lg md:text-xl font-semibold text-gray-800">
                 {selectedLecture?.lectureTitle || "No lecture selected"}
               </h2>
+              {/* Tick mark for current lecture if completed */}
               {selectedLecture && isLectureCompleted(selectedLecture._id) && (
                 <FaCheckCircle
                   className="text-green-500 text-lg"
@@ -331,11 +353,13 @@ const ViewLectures = () => {
               )}
             </div>
 
+            {/* Mark as completed button */}
             {selectedLecture && !isLectureCompleted(selectedLecture._id) && (
               <button
                 onClick={handleMarkCompleted}
-                className="px-4 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 transition"
+                className="px-4 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 transition flex items-center gap-2"
               >
+                <FaCheckCircle className="text-white" />
                 Mark as Completed
               </button>
             )}
@@ -386,56 +410,62 @@ const ViewLectures = () => {
           </div>
         </div>
 
-        {/* Lecture List */}
+        {/* Lecture List with Tick Marks */}
         <div className="mb-6">
           <h2 className="text-lg md:text-xl font-bold mb-4 text-gray-800">
             Course Lectures ({totalLectures})
           </h2>
           <div className="flex flex-col gap-2 max-h-96 overflow-y-auto">
             {selectedCourse?.lectures?.length > 0 ? (
-              selectedCourse.lectures.map((lecture, index) => (
-                <button
-                  key={lecture._id || index}
-                  onClick={() => handleLectureSelect(lecture)}
-                  className={`flex items-center justify-between p-3 rounded-lg border transition text-left w-full
-                    ${
-                      selectedLecture?._id === lecture._id
-                        ? "bg-blue-50 border-blue-500 border-2"
-                        : "hover:bg-gray-50 border-gray-300 hover:border-gray-400"
-                    }
-                    ${
-                      isLectureCompleted(lecture._id)
-                        ? "border-green-200 bg-green-50"
-                        : ""
-                    }
-                  `}
-                >
-                  <div className="flex items-center gap-3 flex-1 min-w-0">
-                    {isLectureCompleted(lecture._id) ? (
-                      <FaCheckCircle className="text-green-500 flex-shrink-0" />
-                    ) : (
-                      <div className="w-4 h-4 rounded-full border border-gray-400 flex-shrink-0"></div>
-                    )}
-                    <div className="flex-1 min-w-0">
-                      <h3 className="text-sm font-semibold text-gray-800 truncate">
-                        {index + 1}. {lecture.lectureTitle}
-                      </h3>
-                      {lecture.duration && (
-                        <p className="text-xs text-gray-500 mt-1">
-                          {formatDuration(lecture.duration)}
-                        </p>
+              selectedCourse.lectures.map((lecture, index) => {
+                const isCompleted = isLectureCompleted(lecture._id);
+                return (
+                  <button
+                    key={lecture._id || index}
+                    onClick={() => handleLectureSelect(lecture)}
+                    className={`flex items-center justify-between p-3 rounded-lg border transition text-left w-full
+                      ${
+                        selectedLecture?._id === lecture._id
+                          ? "bg-blue-50 border-blue-500 border-2"
+                          : "hover:bg-gray-50 border-gray-300 hover:border-gray-400"
+                      }
+                      ${isCompleted ? "border-green-200 bg-green-50" : ""}
+                    `}
+                  >
+                    <div className="flex items-center gap-3 flex-1 min-w-0">
+                      {/* Tick mark or empty circle */}
+                      {isCompleted ? (
+                        <FaCheckCircle className="text-green-500 flex-shrink-0 text-lg" />
+                      ) : (
+                        <div className="w-5 h-5 rounded-full border-2 border-gray-400 flex-shrink-0"></div>
                       )}
+                      <div className="flex-1 min-w-0">
+                        <h3
+                          className={`text-sm font-semibold truncate ${
+                            isCompleted ? "text-green-700" : "text-gray-800"
+                          }`}
+                        >
+                          {index + 1}. {lecture.lectureTitle}
+                        </h3>
+                        {lecture.duration && (
+                          <p className="text-xs text-gray-500 mt-1">
+                            {formatDuration(lecture.duration)}
+                          </p>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                  <FaPlayCircle
-                    className={`text-lg flex-shrink-0 ml-2 ${
-                      selectedLecture?._id === lecture._id
-                        ? "text-blue-600"
-                        : "text-gray-400"
-                    }`}
-                  />
-                </button>
-              ))
+                    <FaPlayCircle
+                      className={`text-lg flex-shrink-0 ml-2 ${
+                        selectedLecture?._id === lecture._id
+                          ? "text-blue-600"
+                          : isCompleted
+                            ? "text-green-500"
+                            : "text-gray-400"
+                      }`}
+                    />
+                  </button>
+                );
+              })
             ) : (
               <div className="text-center py-8">
                 <FaPlayCircle className="text-3xl text-gray-300 mx-auto mb-2" />

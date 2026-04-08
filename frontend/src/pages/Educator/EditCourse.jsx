@@ -366,9 +366,10 @@ const EditCourse = () => {
 
   const getCourseById = useCallback(async () => {
     try {
+      // FIXED: Changed to correct endpoint
       const result = await axios.get(
-        serverUrl + `/api/course/getcourse/${courseId}`,
-        { withCredentials: true }
+        serverUrl + `/api/course/single/${courseId}`,
+        { withCredentials: true },
       );
       setSelectCourse(result.data);
     } catch (error) {
@@ -402,45 +403,52 @@ const EditCourse = () => {
     formData.append("category", category);
     formData.append("level", level);
     formData.append("price", price);
-    formData.append("thumbnail", backendImage);
-    formData.append("isPublished", isPublished);
-    try {
-      const result = await axios.post(
-        serverUrl + `/api/course/editcourse/${courseId}`,
-        formData,
-        { withCredentials: true }
-      );
-      const updateData = result.data;
-      if (updateData.isPublished) {
-        const updateCourses = courseData.map((c) =>
-          c._id === courseId ? updateData : c
-        );
+    if (backendImage) {
+      formData.append("thumbnail", backendImage);
+    }
+    formData.append("isPublished", isPublished.toString());
 
-        if (!courseData.some((c) => c._id == courseId)) {
-          updateCourses.push(updateData);
-        }
-        dispatch(setCourseData(updateCourses));
-      } else {
-        const filterCourse = courseData.filter((c) => c._id !== courseId);
-        dispatch(setCourseData(filterCourse));
+    try {
+      // FIXED: Changed to PUT and correct endpoint
+      const result = await axios.put(
+        serverUrl + `/api/course/update/${courseId}`,
+        formData,
+        { withCredentials: true },
+      );
+
+      const updatedCourse = result.data;
+      console.log("Course updated:", updatedCourse);
+      console.log("Published status:", updatedCourse.isPublished);
+
+      // Update the course in Redux store
+      if (courseData) {
+        const updatedCourses = courseData.map((course) =>
+          course._id === courseId ? updatedCourse : course,
+        );
+        dispatch(setCourseData(updatedCourses));
       }
+
       setLoading(false);
-      // dispatch(updateCourseInCreatorData(result.data));
+      toast.success("Course Updated Successfully");
       navigate("/courses");
-      toast.success("Course Updated");
     } catch (error) {
       console.log(error);
       setLoading(false);
-      toast.error(error.response.data.message);
+      toast.error(error.response?.data?.message || "Error updating course");
     }
   };
 
   const handleRemoveCourse = async () => {
     setLoading1(true);
     try {
+      // const result = await axios.delete(
+      //   serverUrl + `/api/course/remove/${courseId}`,
+      //   { withCredentials: true },
+      // );
+
       const result = await axios.delete(
-        serverUrl + `/api/course/remove/${courseId}`,
-        { withCredentials: true }
+        serverUrl + `/api/course/delete/${courseId}`, // ✅ Correct
+        { withCredentials: true },
       );
       console.log(result.data);
       const filterCourse = courseData.filter((c) => c._id !== courseId);

@@ -3,11 +3,14 @@ import userSlice from "./userSlice.js";
 import courseSlice from "./courseSlice.js";
 import lectureSlice from "./lectureSlice.js";
 import reviewSlice from "./reviewSlice.js";
+import recommendationSlice from "./recommendationSlice.js";
+
 export const store = configureStore({
   reducer: {
     user: userSlice,
     course: courseSlice,
     lecture: lectureSlice,
     review: reviewSlice,
+    recommendation: recommendationSlice,
   },
 });

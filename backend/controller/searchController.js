@@ -1,93 +1,3 @@
-// import Course from "../model/courseModel.js";
-// import { GoogleGenAI } from "@google/genai";
-// import dotenv from "dotenv";
-// dotenv.config();
-
-// export const searchWithAi = async (req, res) => {
-//   try {
-//     const { input } = req.body;
-
-//     if (!input || input.trim() === "") {
-//       return res.status(400).json({
-//         message: "Search Query is Required",
-//         courses: [],
-//       });
-//     }
-
-//     console.log("Search query received:", input);
-
-//     // First: Direct search with user input
-//     let courses = await Course.find({
-//       isPublished: true,
-//       $or: [
-//         { title: { $regex: input, $options: "i" } },
-//         { subTitle: { $regex: input, $options: "i" } },
-//         { description: { $regex: input, $options: "i" } },
-//         { category: { $regex: input, $options: "i" } },
-//         { level: { $regex: input, $options: "i" } },
-//       ],
-//     }).limit(20); // Limit results for better performance
-
-//     console.log("Direct search results:", courses.length);
-
-//     if (courses.length > 0) {
-//       return res.status(200).json(courses);
-//     }
-
-//     // Second: If no results, try with AI-extracted keyword
-//     try {
-//       const ai = new GoogleGenAI({
-//         apiKey: process.env.GEMINI_API_KEY,
-//       });
-
-//       const prompt = `
-// Extract the most relevant single keyword from the following user query for course search.
-// Choose from these categories: App Development, AI/ML, AI Tools, Data Science, Data Analytics,
-// Ethical Hacking, UI UX Designing, Web Development, Others, Beginner, Intermediate, Advanced.
-
-// User query: "${input}"
-
-// Return ONLY the keyword, nothing else.
-// `;
-
-//       const response = await ai.models.generateContent({
-//         model: "gemini-2.5-flash",
-//         contents: prompt,
-//       });
-
-//       const keyword = response.text().trim();
-//       console.log("AI extracted keyword:", keyword);
-
-//       // Search with AI keyword
-//       courses = await Course.find({
-//         isPublished: true,
-//         $or: [
-//           { title: { $regex: keyword, $options: "i" } },
-//           { subTitle: { $regex: keyword, $options: "i" } },
-//           { description: { $regex: keyword, $options: "i" } },
-//           { category: { $regex: keyword, $options: "i" } },
-//           { level: { $regex: keyword, $options: "i" } },
-//         ],
-//       }).limit(20);
-
-//       console.log("AI keyword search results:", courses.length);
-
-//       return res.status(200).json(courses);
-//     } catch (aiError) {
-//       console.error("AI extraction failed:", aiError);
-//       // Return empty array if AI fails
-//       return res.status(200).json([]);
-//     }
-//   } catch (error) {
-//     console.error("Search error:", error);
-//     return res.status(500).json({
-//       message: "Failed to search course",
-//       error: error.message,
-//       courses: [],
-//     });
-//   }
-// };
-
 import Course from "../model/courseModel.js";
 import { GoogleGenAI } from "@google/genai";
 import dotenv from "dotenv";
@@ -254,7 +164,7 @@ export const searchWithAi = async (req, res) => {
             "teach",
             "courses",
             "course",
-          ].includes(word)
+          ].includes(word),
       );
 
     if (words.length > 0) {
@@ -273,7 +183,7 @@ export const searchWithAi = async (req, res) => {
 
         if (courses.length > 0) {
           searchLog.push(
-            `✅ Found ${courses.length} courses with word: "${word}"`
+            `✅ Found ${courses.length} courses with word: "${word}"`,
           );
           console.log(searchLog.join(" | "));
           return res.status(200).json(courses);
@@ -324,7 +234,7 @@ Return ONLY the main subject/skill as a single word or short phrase.`;
 
           if (courses.length > 0) {
             searchLog.push(
-              `✅ Found ${courses.length} courses with AI keyword`
+              `✅ Found ${courses.length} courses with AI keyword`,
             );
             console.log(searchLog.join(" | "));
             return res.status(200).json(courses);

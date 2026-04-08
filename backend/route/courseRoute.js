@@ -1,51 +1,65 @@
 import express from "express";
-import {
-  createCourse,
-  createLecture,
-  editCourse,
-  editLecture,
-  getCourseLecture,
-  getCoursesById,
-  getCreatorById,
-  getCreatorCourses,
-  getPublishedCourses,
-  removeCourse,
-  removeLecture,
-} from "../controller/courseController.js";
 import isAuth from "../middleware/isAuth.js";
 import upload from "../middleware/multer.js";
-import { searchWithAi } from "../controller/searchController.js";
+import {
+  getPublishedCourses,
+  getCreatorCourses,
+  getAllCourse, // ✅ Now this exists
+  getCoursesById,
+  createCourse,
+  editCourse,
+  removeCourse,
+  getCreatorById,
+  createLecture,
+  getCourseLecture,
+  editLecture,
+  removeLecture,
+  searchCourses,
+} from "../controller/courseController.js";
+import {
+  getSimilarCourses,
+  trackCourseView,
+  getCourseStats,
+} from "../controller/recommendationController.js";
 
 const courseRouter = express.Router();
 
-courseRouter.post("/create", isAuth, createCourse);
-courseRouter.get("/getpublished", getPublishedCourses);
-courseRouter.get("/getcreator", isAuth, getCreatorCourses);
+// ============ PUBLIC ROUTES ============
+courseRouter.get("/published", getPublishedCourses);
+courseRouter.get("/allcourses", getAllCourse); // ✅ Fixed: now uses getAllCourse
+courseRouter.get("/single/:courseId", getCoursesById);
+courseRouter.post("/creator", getCreatorById); // Get creator by ID
+courseRouter.get("/similar/:courseId", getSimilarCourses); // 🔥 NEW
+courseRouter.get("/stats/:courseId", getCourseStats); // 🔥 NEW
 
-courseRouter.post(
-  "/editcourse/:courseId",
-  isAuth,
-  upload.single("thumbnail"),
-  editCourse
-);
+// ============ PROTECTED ROUTES ============
+courseRouter.use(isAuth);
 
-courseRouter.get("/getcourse/:courseId", isAuth, getCoursesById);
+// 🔥 NEW: Track course view
+courseRouter.post("/track-view", trackCourseView);
 
-courseRouter.delete("/remove/:courseId", isAuth, removeCourse);
+// ============ INSTRUCTOR COURSE MANAGEMENT ============
+// ============ INSTRUCTOR COURSE MANAGEMENT ============
+courseRouter.post("/create", createCourse);
+courseRouter.put("/update/:courseId", upload.single("thumbnail"), editCourse); // ✅ FIXED: Added multer
+courseRouter.delete("/delete/:courseId", removeCourse);
+courseRouter.put("/publish/:courseId", editCourse); // Toggle publish status
 
-//For Lectures
-courseRouter.post("/createlecture/:courseId", isAuth, createLecture);
-courseRouter.get("/courselecture/:courseId", isAuth, getCourseLecture);
-courseRouter.post(
-  "/editlecture/:lectureId",
-  isAuth,
-  upload.single("videoUrl"),
-  editLecture
-);
-courseRouter.delete("/removelecture/:lectureId", isAuth, removeLecture);
-courseRouter.post("/creator", isAuth, getCreatorById);
+// ============ INSTRUCTOR DASHBOARD ============
+courseRouter.get("/creator-courses", getCreatorCourses); // Get instructor's courses
 
-// for serch
-courseRouter.post("/search", searchWithAi);
+// ============ LECTURE MANAGEMENT ============
+// courseRouter.post("/:courseId/lecture", createLecture);
+// courseRouter.get("/:courseId/lectures", getCourseLecture);
+// courseRouter.put("/lecture/:lectureId", editLecture);
+// courseRouter.delete("/lecture/:lectureId", removeLecture);
+// ============ LECTURE MANAGEMENT ============
+courseRouter.post("/:courseId/lecture", createLecture);
+courseRouter.get("/:courseId/lectures", getCourseLecture);
+courseRouter.put("/lecture/:lectureId", upload.single("video"), editLecture); // ✅ ADD MULTER HERE
+courseRouter.delete("/lecture/:lectureId", removeLecture);
+
+// Add this after your existing public routes
+courseRouter.get("/search", searchCourses); // Add this line
 
 export default courseRouter;

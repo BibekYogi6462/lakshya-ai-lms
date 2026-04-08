@@ -29,10 +29,11 @@ const ReviewPage = () => {
             key={index}
             comment={review.comment}
             rating={review.rating}
-            photoUrl={review.user.photoUrl}
-            name={review.user.name}
-            courseTitle={review.course.title}
-            description={review.user.description}
+            // 🔥 FIXED: Added safety checks with fallback values
+            photoUrl={review.user?.photoUrl || "/default-avatar.png"}
+            name={review.user?.name || "Anonymous User"}
+            courseTitle={review.course?.title || "Unknown Course"}
+            description={review.user?.description || "No description available"}
           />
         ))}
       </div>

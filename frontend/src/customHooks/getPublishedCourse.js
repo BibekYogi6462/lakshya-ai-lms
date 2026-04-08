@@ -75,13 +75,16 @@ const getPublishedCourse = () => {
 
     const getCourseData = async () => {
       try {
-        const result = await axios.get(serverUrl + "/api/course/getpublished", {
+        // ✅ FIXED: Remove 'get' from the endpoint
+        const result = await axios.get(serverUrl + "/api/course/published", {
           withCredentials: true,
         });
 
+        console.log("✅ Courses fetched:", result.data.length);
         dispatch(setCourseData(result.data));
       } catch (error) {
-        console.log(error);
+        console.log("❌ API Error:", error.message);
+        console.log("❌ Full error:", error);
       }
     };
     getCourseData();

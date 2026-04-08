@@ -1,44 +1,88 @@
+// import express from "express";
+// import dotenv from "dotenv";
+// import cors from "cors";
+// import cookieParser from "cookie-parser";
+// import connectDB from "./config/connectDB.js";
+
+// // Import routes
+// import authRouter from "./route/authRoute.js";
+// import userRouter from "./route/userRoute.js";
+// import courseRouter from "./route/courseRoute.js";
+// import orderRouter from "./route/orderRoute.js";
+// import reviewRouter from "./route/reviewRoute.js";
+// import progressRouter from "./route/progressRoute.js";
+// import recommendationRouter from "./route/recommendationRoute.js";
+
+// dotenv.config();
+// connectDB();
+
+// const app = express();
+// const PORT = process.env.PORT || 8000;
+
+// // Middleware
+// app.use(express.json());
+// app.use(cookieParser());
+// app.use(
+//   cors({
+//     origin: process.env.FRONTEND_URL || "http://localhost:5173",
+//     credentials: true,
+//   }),
+// );
+
+// // Routes
+// app.use("/api/auth", authRouter);
+// app.use("/api/user", userRouter);
+// app.use("/api/course", courseRouter);
+// app.use("/api/order", orderRouter);
+// app.use("/api/review", reviewRouter);
+// app.use("/api/progress", progressRouter);
+// app.use("/api/recommendation", recommendationRouter);
+
+// app.listen(PORT, () => {
+//   console.log(`Server running on port ${PORT}`);
+// });
 import express from "express";
 import dotenv from "dotenv";
-import connectDb from "./config/connectDB.js";
-import cookieParser from "cookie-parser";
-import authRouter from "./route/authRoute.js";
 import cors from "cors";
+import cookieParser from "cookie-parser";
+import connectDB from "./config/connectDB.js";
+
+// Import routes
+import authRouter from "./route/authRoute.js";
 import userRouter from "./route/userRoute.js";
 import courseRouter from "./route/courseRoute.js";
-import orderRoute from "./route/orderRoute.js";
-import progressRoutes from "./route/progress.js"; // Fixed path
+import orderRouter from "./route/orderRoute.js";
 import reviewRouter from "./route/reviewRoute.js";
+import progressRouter from "./route/progressRoute.js";
+import recommendationRouter from "./route/recommendationRoute.js";
+import adminRoutes from "./route/adminRoute.js"; // ← ADD THIS LINE
 
 dotenv.config();
-
-const port = process.env.PORT;
+connectDB();
 
 const app = express();
+const PORT = process.env.PORT || 8000;
 
+// Middleware
 app.use(express.json());
 app.use(cookieParser());
-
 app.use(
   cors({
-    origin: "http://localhost:5173",
+    origin: process.env.FRONTEND_URL || "http://localhost:5173",
     credentials: true,
-  })
+  }),
 );
 
-// Your routes
+// Routes
 app.use("/api/auth", authRouter);
 app.use("/api/user", userRouter);
 app.use("/api/course", courseRouter);
-app.use("/api/order", orderRoute);
-app.use("/api/progress", progressRoutes); // Progress routes
-app.use("/api/review", reviewRouter); // Progress routes
+app.use("/api/order", orderRouter);
+app.use("/api/review", reviewRouter);
+app.use("/api/progress", progressRouter);
+app.use("/api/recommendation", recommendationRouter);
+app.use("/api/admin", adminRoutes); // ← ADD THIS LINE
 
-app.get("/", (req, res) => {
-  res.send("Hello from Server");
-});
-
-app.listen(port, () => {
-  console.log(`Server is running on http://localhost:${port}`);
-  connectDb();
+app.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
 });
