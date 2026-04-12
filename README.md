@@ -18,23 +18,23 @@ LAKSHYA is a modern, AI-powered Learning Management System (LMS) built with the 
 <div align="center">
   <table>
     <tr>
-      <td align="center"><b>🏠 Home</b><br><img src="LMS_Screenshots/home.png" width="300"></td>
-      <td align="center"><b>📚 Course</b><br><img src="LMS_Screenshots/course.png" width="300"></td>
+      <td align="center"><b>🏠 Home</b><br><img src="LMS_Screenshots/Home.jpg" width="300"></td>
+      <td align="center"><b>📚 Course</b><br><img src="LMS_Screenshots/Course.jpg" width="300"></td>
     </tr>
     <tr>
-      <td align="center"><b>🎬 Lecture</b><br><img src="LMS_Screenshots/lecture.png" width="300"></td>
-      <td align="center"><b>🔐 Login & Signup</b><br><img src="LMS_Screenshots/login.png" width="300"></td>
+      <td align="center"><b>🎬 Lecture</b><br><img src="LMS_Screenshots/Lecture.jpg" width="300"></td>
+      <td align="center"><b>🔐 Login & Signup</b><br><img src="LMS_Screenshots/LoginandSignup.jpg" width="300"></td>
     </tr>
     <tr>
-      <td align="center"><b>💳 Payment</b><br><img src="LMS_Screenshots/payment.png" width="300"></td>
-      <td align="center"><b>⭐ Review</b><br><img src="LMS_Screenshots/review.png" width="300"></td>
+      <td align="center"><b>💳 Payment</b><br><img src="LMS_Screenshots/Paypal.jpg" width="300"></td>
+      <td align="center"><b>⭐ Review</b><br><img src="LMS_Screenshots/Review.jpg" width="300"></td>
     </tr>
   </table>
 </div>
 ⚙️ Installation & Setup
 1. Clone the Repository
 bash
-git clone https://github.com/your-username/LAKSHYA-AI-LMS.git
+git clone https://github.com/BibekYogi6462/lakshya-ai-lms.git
 cd LAKSHYA-AI-LMS
 2. Backend Setup
 bash
