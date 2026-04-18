@@ -379,7 +379,7 @@ const ViewCourse = () => {
               </div>
               <div className="text-lg font-semibold text-black">
                 <span>${selectedCourse?.price}</span>{" "}
-                <span className="line-through text-sm text-gray-400">$599</span>
+                <span className="line-through text-sm text-gray-400"></span>
               </div>
 
               <ul className="text-sm text-gray-700 space-y-1 pt-2">

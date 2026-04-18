@@ -734,7 +734,8 @@ export const editCourse = async (req, res) => {
     if (req.file) {
       console.log("Uploading to Cloudinary...");
       try {
-        thumbnail = await uploadOnCloudinary(req.file.path);
+        // thumbnail = await uploadOnCloudinary(req.file.path);
+        thumbnail = await uploadOnCloudinary(req.file.buffer, true); //
         console.log("Cloudinary upload successful:", thumbnail);
       } catch (cloudinaryError) {
         console.error("Cloudinary upload error:", cloudinaryError);
@@ -948,7 +949,12 @@ export const editLecture = async (req, res) => {
     if (req.file) {
       console.log("Uploading video to Cloudinary...");
       try {
-        videoUrl = await uploadOnCloudinary(req.file.path);
+        // videoUrl = await uploadOnCloudinary(req.file.path);
+        videoUrl = await uploadOnCloudinary(
+          req.file.buffer,
+          true,
+          req.file.mimetype,
+        );
         lecture.videoUrl = videoUrl;
       } catch (uploadError) {
         console.error("Cloudinary upload error:", uploadError);
